@@ -1,0 +1,8 @@
+# Entorno virtual
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+chroma_db/
+/home/david/projects/IA/tax_consultancy_rag/chroma_db/
