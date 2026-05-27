@@ -11,22 +11,22 @@ from config import *
 from prompts import *
 load_dotenv()
 
-# INICIALIZACIÓN DE LA ARQUITECTURA RAG
-@st.cache_resource # Esto es un decorator para streamlist que hace que la función se ejecute solo una vez y luego almacene en caché el resultado, evitando re-ejecutar la inicialización del sistema RAG cada vez que se hace una consulta o se actualiza la interfaz.
+# INIT RAG ARCHITECTURE
+@st.cache_resource # This is a decorator provided by Streamlit that allows us to cache the result of the function, so that it only runs once and then stores the result in cache. This is particularly useful for initializing the RAG system, which can be resource-intensive, as it avoids re-running the initialization every time a query is made or the interface is updated. By caching the initialized RAG system, we can significantly improve the performance and responsiveness of our application, especially when dealing with large vector stores and complex retriever configurations.
 def initialize_rag_system():
 
     # Vector Store
-    vectorestore = Chroma(
+    vectorstore = Chroma(
         embedding_function=OpenAIEmbeddings(model=EMBEDDING_MODEL),
         persist_directory=CHROMA_DB_PATH
     )
 
-    # Modelos
+    # Models
     llm_queries = ChatOpenAI(model=QUERY_MODEL, temperature=0) # modelo más rápido para generar consultas
     llm_generation = ChatOpenAI(model=GENERATION_MODEL, temperature=0) # modelo más potente para generar respuestas
 
     # Retriever MMR (Maximal Margin Relevance)
-    base_retriever = vectorestore.as_retriever(
+    base_retriever = vectorstore.as_retriever(
         search_type=SEARCH_TYPE,
         search_kwargs={
             "k": SEARCH_K,
@@ -35,8 +35,10 @@ def initialize_rag_system():
         }
     )
 
-    # Retriever adicional con similarity para comparar
-    similarity_retriever = vectorestore.as_retriever(
+    # Additional retriever, similarity, useful to compare
+    # Pros: Semantic understanding and simplicity
+    # Cons: The problem with diversity: If you ask for $k=4$, it may sometimes return 4 fragments that say exactly the same thing using slightly different wording. This wastes space in the LLM's context window.
+    similarity_retriever = vectorstore.as_retriever(
         search_type="similarity",
         search_kwargs={"k": SEARCH_K}
     )
@@ -44,7 +46,7 @@ def initialize_rag_system():
     # Prompt personalizado para MultiQueryRetriever
     multi_query_prompt = PromptTemplate.from_template(MULTI_QUERY_PROMPT)
 
-    # MultiQueryRetriever con prompt personalizado
+    # MultiQueryRetriever with custom prompt. It generates multiple queries from the original question to retrieve a more diverse set of relevant documents, which can help improve the quality of the generated response by providing a richer context. The custom prompt allows us to guide the query generation process, ensuring that the generated queries are focused and relevant to the user's original question, which can lead to better retrieval results and ultimately a more accurate and informative response from the LLM.
     mmr_multi_retriever = MultiQueryRetriever.from_llm(
         retriever=base_retriever,
         llm=llm_queries,
